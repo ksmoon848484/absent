@@ -102,7 +102,7 @@ translations = {
     "ko": {
         "password_prompt": "비밀번호를 입력하세요",
         "password_error": "비밀번호가 올바르지 않습니다.",
-        "title": "결근율 대시보드",
+        "title": "QIP 인센티브 평가 기준 실적 대시보드",
         "description": "엑셀 파일의 각 시트를 활용한 대시보드입니다.",
         "page_select": "페이지 선택",
         "detail": "Detail 데이터",
@@ -118,7 +118,7 @@ translations = {
     "en": {
         "password_prompt": "Enter the password",
         "password_error": "Incorrect password.",
-        "title": "Absence Rate Dashboard",
+        "title": "QIP Incentive Evaluation Criteria Performance Dashboard",
         "description": "This dashboard utilizes Excel files to display data.",
         "page_select": "Select Page",
         "detail": "Detail Data",
@@ -134,7 +134,7 @@ translations = {
     "vi": {
         "password_prompt": "Nhập mật khẩu",
         "password_error": "Mật khẩu không chính xác.",
-        "title": "Bảng điều khiển tỷ lệ vắng mặt",
+        "title": "Bảng điều khiển kết quả theo tiêu chí đánh giá khuyến khích QIP",
         "description": "Bảng điều khiển này sử dụng file Excel để hiển thị dữ liệu.",
         "page_select": "Chọn trang",
         "detail": "Dữ liệu Detail",
