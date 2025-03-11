@@ -213,21 +213,36 @@ if password != "hwkqip":
     st.stop()
 
 ##############################################
-# 3. 데이터 로딩 (pandas + openpyxl 필요)
+# 3. 데이터 로딩 및 전처리 (pandas + openpyxl 필요)
 ##############################################
 @st.cache_data
 def load_data():
     file_path = 'aggregated_absence_rate_by_group.xlsx'
     xls = pd.ExcelFile(file_path)
+    
     detail = pd.read_excel(xls, sheet_name='Detail')
     team1 = pd.read_excel(xls, sheet_name='team summary1')
     team2 = pd.read_excel(xls, sheet_name='team summary2')
+    
+    # 결근율 컬럼을 숫자로 변환하는 헬퍼 함수
+    def convert_absence_rate(df, col_name="Absence Rate (%)"):
+        if col_name in df.columns:
+            # 1) % 기호 제거 (문자열로 변환 후)
+            df[col_name] = df[col_name].astype(str).str.replace("%", "", regex=False)
+            # 2) 문자열 -> 숫자 변환 (변환 실패 시 NaN 처리)
+            df[col_name] = pd.to_numeric(df[col_name], errors="coerce")
+        return df
+
+    detail = convert_absence_rate(detail, "Absence Rate (%)")
+    team1 = convert_absence_rate(team1, "Absence Rate (%)")
+    team2 = convert_absence_rate(team2, "Absence Rate (%)")
+    
     return detail, team1, team2
 
 detail_df, team1_df, team2_df = load_data()
 
 ##############################################
-# 4. 레이아웃 & UI 기본 설정
+# 4. 레이아웃 및 UI 기본 설정
 ##############################################
 st.title(t["title"])
 st.write(t["description"])
@@ -241,7 +256,7 @@ selected_page = st.sidebar.radio(t["page_select"], list(pages.keys()))
 sheet_name = pages[selected_page]
 
 ##############################################
-# 5. AgGrid를 활용한 인터랙티브 테이블
+# 5. AgGrid를 활용한 인터랙티브 테이블 표시 함수
 ##############################################
 def show_aggrid(data):
     gb = GridOptionsBuilder.from_dataframe(data)
@@ -254,7 +269,7 @@ def show_aggrid(data):
     AgGrid(data, gridOptions=grid_options, theme='light', height=300, fit_columns_on_grid_load=True)
 
 ##############################################
-# 6. KPI 카드: 평균, 최대, 최소 Absence Rate
+# 6. KPI 카드: 평균, 최대, 최소 Absence Rate 계산 및 표시 함수
 ##############################################
 def show_kpi(data, rate_col: str):
     """
@@ -273,12 +288,12 @@ def show_kpi(data, rate_col: str):
         st.warning(f"Column '{rate_col}' not found in the DataFrame.")
 
 ##############################################
-# 7. 상위 5 데이터 + 시각화
+# 7. 상위 5 데이터 및 시각화 함수
 ##############################################
 def show_top5(data, rate_col: str, label_col: str = None):
     """
     rate_col 기준으로 상위 5개 추출하여 테이블 및 막대 차트 표시.
-    label_col을 지정하면 x축 레이블로 사용, 지정하지 않으면 index 사용.
+    label_col을 지정하면 x축 라벨로 사용, 지정하지 않으면 index 사용.
     """
     if rate_col not in data.columns:
         st.warning(f"Column '{rate_col}' not found in the DataFrame.")
@@ -305,43 +320,41 @@ def show_top5(data, rate_col: str, label_col: str = None):
 # 8. 페이지별(시트별) 내용 구성
 ##############################################
 if sheet_name == "Detail":
-    # Detail 시트
     st.header(t["detail"])
     
-    # 8-1) KPI 카드: "Absence Rate (%)" 기준
+    # KPI 카드: "Absence Rate (%)" 기준
     show_kpi(detail_df, "Absence Rate (%)")
     
-    # 8-2) 인터랙티브 테이블 (익스팬더에 숨김)
+    # 인터랙티브 테이블 (익스팬더에 숨김)
     with st.expander(t["interactive_table"]):
         show_aggrid(detail_df)
     
-    # 8-3) 상위 5 (rate_col='Absence Rate (%)', label_col='AREA' 예시)
+    # 상위 5 데이터 및 시각화 (예: AREA 컬럼을 레이블로 사용)
     show_top5(detail_df, "Absence Rate (%)", label_col="AREA")
 
 elif sheet_name == "team summary1":
-    # team summary1 시트
     st.header(t["team_summary1"])
     
-    # 8-1) KPI 카드: "Absence Rate (%)" 기준
+    # KPI 카드: "Absence Rate (%)" 기준
     show_kpi(team1_df, "Absence Rate (%)")
     
-    # 8-2) 인터랙티브 테이블
+    # 인터랙티브 테이블
     with st.expander(t["interactive_table"]):
         show_aggrid(team1_df)
     
-    # 8-3) 상위 5
+    # 상위 5 데이터 및 시각화 (예: AREA 컬럼을 레이블로 사용)
     show_top5(team1_df, "Absence Rate (%)", label_col="AREA")
 
 elif sheet_name == "team summary2":
-    # team summary2 시트
     st.header(t["team_summary2"])
     
-    # 8-1) KPI 카드: "Absence Rate (%)" 기준
+    # KPI 카드: "Absence Rate (%)" 기준
     show_kpi(team2_df, "Absence Rate (%)")
     
-    # 8-2) 인터랙티브 테이블
+    # 인터랙티브 테이블
     with st.expander(t["interactive_table"]):
         show_aggrid(team2_df)
     
-    # 8-3) 상위 5
+    # 상위 5 데이터 및 시각화 (예: AREA 컬럼을 레이블로 사용)
     show_top5(team2_df, "Absence Rate (%)", label_col="AREA")
+
