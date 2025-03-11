@@ -130,12 +130,13 @@
 #     # 상위 5 데이터 및 시각화 (예: AREA 컬럼을 레이블로 사용)
 #     show_top5(team2_df, "Absence Rate (%)", label_col="AREA")
 
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 다국어 번역 딕셔너리
+##############################################
+# 1. 다국어 번역 딕셔너리
+##############################################
 translations = {
     "ko": {
         "password_prompt": "비밀번호를 입력하세요",
@@ -181,19 +182,22 @@ translations = {
     }
 }
 
-# 사이드바에 언어 선택 추가
+##############################################
+# 2. 사이드바: 언어 선택 및 비밀번호 보호
+##############################################
 language_options = {"Korean": "ko", "English": "en", "Vietnamese": "vi"}
 selected_language_name = st.sidebar.selectbox("Select Language / 언어 선택 / Chọn ngôn ngữ", list(language_options.keys()))
 lang_code = language_options[selected_language_name]
 t = translations[lang_code]
 
-# 비밀번호 입력 (비밀번호: hwkqip)
 password = st.text_input(t["password_prompt"], type="password")
 if password != "hwkqip":
     st.error(t["password_error"])
     st.stop()
 
-# 데이터 로딩 함수 (캐시 사용)
+##############################################
+# 3. 데이터 로딩 및 전처리 (엑셀 파일 내 "Absence Rate (%)" 컬럼 숫자형 변환)
+##############################################
 @st.cache_data
 def load_data():
     file_path = 'aggregated_absence_rate_by_group.xlsx'
@@ -201,29 +205,54 @@ def load_data():
     detail = pd.read_excel(xls, sheet_name='Detail')
     team1 = pd.read_excel(xls, sheet_name='team summary1')
     team2 = pd.read_excel(xls, sheet_name='team summary2')
+    
+    # "Absence Rate (%)" 컬럼을 숫자형으로 변환하는 함수
+    def convert_absence_rate(df, col_name="Absence Rate (%)"):
+        if col_name in df.columns:
+            df[col_name] = df[col_name].astype(str).str.replace("%", "", regex=False)
+            df[col_name] = pd.to_numeric(df[col_name], errors="coerce")
+        return df
+
+    detail = convert_absence_rate(detail, "Absence Rate (%)")
+    team1 = convert_absence_rate(team1, "Absence Rate (%)")
+    team2 = convert_absence_rate(team2, "Absence Rate (%)")
+    
     return detail, team1, team2
 
-# 엑셀 데이터 불러오기
 detail_df, team1_df, team2_df = load_data()
 
-# KPI 카드 함수: "Absence Rate (%)" 칼럼만 사용하여 계산 (나머지 칼럼 제외)
-def show_kpi_card(df):
-    if "Absence Rate (%)" in df.columns:
-        avg_rate = df["Absence Rate (%)"].mean()
-        max_rate = df["Absence Rate (%)"].max()
-        min_rate = df["Absence Rate (%)"].min()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Avg Absence Rate", f"{avg_rate:.2f}%")
-        col2.metric("Max Absence Rate", f"{max_rate:.2f}%")
-        col3.metric("Min Absence Rate", f"{min_rate:.2f}%")
-    else:
-        st.warning("Absence Rate (%) column not found.")
+##############################################
+# 4. 개선된 KPI 카드 함수 (더 디테일한 통계 지표 제공)
+##############################################
+def show_detailed_kpi(df, rate_col: str):
+    if rate_col in df.columns:
+        mean_val = df[rate_col].mean()
+        median_val = df[rate_col].median()
+        std_val = df[rate_col].std()
+        max_val = df[rate_col].max()
+        min_val = df[rate_col].min()
+        count_val = df[rate_col].count()
 
-# 대시보드 타이틀 및 설명
+        # 첫 번째 행: 평균, 중앙값, 표준편차
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Mean Absence Rate", f"{mean_val:.2f}%")
+        col2.metric("Median Absence Rate", f"{median_val:.2f}%")
+        col3.metric("Std. Deviation", f"{std_val:.2f}")
+
+        # 두 번째 행: 최대, 최소, 데이터 건수
+        col4, col5, col6 = st.columns(3)
+        col4.metric("Max Absence Rate", f"{max_val:.2f}%")
+        col5.metric("Min Absence Rate", f"{min_val:.2f}%")
+        col6.metric("Total Records", f"{count_val}")
+    else:
+        st.warning(f"Column '{rate_col}' not found in the DataFrame.")
+
+##############################################
+# 5. 대시보드 기본 UI: 타이틀, 설명, 페이지(시트) 선택
+##############################################
 st.title(t["title"])
 st.write(t["description"])
 
-# 페이지(시트) 선택
 pages = {
     t["detail"]: "Detail",
     t["team_summary1"]: "team summary1",
@@ -232,27 +261,28 @@ pages = {
 selected_page = st.sidebar.radio(t["page_select"], list(pages.keys()))
 sheet_name = pages[selected_page]
 
-# 각 페이지별 데이터 및 시각화 표시
+##############################################
+# 6. 각 시트별 데이터 및 시각화
+##############################################
 if sheet_name == "Detail":
     st.header(t["detail"])
-    # KPI 카드 추가 (결근율만 사용)
-    show_kpi_card(detail_df)
+    # KPI 카드: "Absence Rate (%)"에 대한 자세한 통계
+    show_detailed_kpi(detail_df, "Absence Rate (%)")
     st.dataframe(detail_df)
     st.subheader(t["detail_distribution"])
-    # 'Absence Rate (%)' 컬럼을 기준으로 히스토그램 시각화
     if "Absence Rate (%)" in detail_df.columns:
         fig, ax = plt.subplots()
         ax.hist(detail_df["Absence Rate (%)"].dropna(), bins=20)
         ax.set_xlabel("Absence Rate (%)")
         ax.set_ylabel("Frequency")
         st.pyplot(fig)
-        
+
 elif sheet_name == "team summary1":
     st.header(t["team_summary1"])
-    show_kpi_card(team1_df)
+    show_detailed_kpi(team1_df, "Absence Rate (%)")
     st.dataframe(team1_df)
     st.subheader(t["team_summary1_average"])
-    # 예시: '팀'과 '평균 결근율' 칼럼을 활용한 막대 차트 (실제 칼럼명이 다르면 수정 필요)
+    # 예시: "팀"과 "평균 결근율" 컬럼 사용 (실제 컬럼명이 다르면 수정 필요)
     if "팀" in team1_df.columns and "평균 결근율" in team1_df.columns:
         fig, ax = plt.subplots()
         ax.bar(team1_df["팀"], team1_df["평균 결근율"])
@@ -262,17 +292,15 @@ elif sheet_name == "team summary1":
 
 elif sheet_name == "team summary2":
     st.header(t["team_summary2"])
-    show_kpi_card(team2_df)
+    show_detailed_kpi(team2_df, "Absence Rate (%)")
     st.dataframe(team2_df)
     st.subheader(t["team_summary2_comparison"])
-    # 예시: '팀'과 '결근율' 칼럼을 활용한 선 그래프 (실제 칼럼명이 다르면 수정 필요)
+    # 예시: "팀"과 "결근율" 컬럼 사용 (실제 컬럼명이 다르면 수정 필요)
     if "팀" in team2_df.columns and "결근율" in team2_df.columns:
         fig, ax = plt.subplots()
         ax.plot(team2_df["팀"], team2_df["결근율"], marker='o')
         ax.set_xlabel("팀")
         ax.set_ylabel("결근율")
         st.pyplot(fig)
-    
-    # (상위 5 데이터 및 시각화 등 추가 기능은 필요시 별도로 구현)
 
 
