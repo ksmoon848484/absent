@@ -101,7 +101,7 @@ translations = {
     "ko": {
         "password_prompt": "비밀번호를 입력하세요",
         "password_error": "비밀번호가 올바르지 않습니다.",
-        "title": "인센티브 대시보드",
+        "title": "결근율 대시보드",
         "description": "엑셀 파일의 각 시트를 활용한 대시보드입니다.",
         "page_select": "페이지 선택",
         "detail": "Detail 데이터",
@@ -117,7 +117,7 @@ translations = {
     "en": {
         "password_prompt": "Enter the password",
         "password_error": "Incorrect password.",
-        "title": "Incentive Dashboard",
+        "title": "Absence Rate Dashboard",
         "description": "This dashboard utilizes Excel files to display data.",
         "page_select": "Select Page",
         "detail": "Detail Data",
@@ -133,7 +133,7 @@ translations = {
     "vi": {
         "password_prompt": "Nhập mật khẩu",
         "password_error": "Mật khẩu không chính xác.",
-        "title": "Bảng điều khiển khuyến khích",
+        "title": "Bảng điều khiển tỷ lệ vắng mặt",
         "description": "Bảng điều khiển này sử dụng file Excel để hiển thị dữ liệu.",
         "page_select": "Chọn trang",
         "detail": "Dữ liệu Detail",
@@ -184,6 +184,7 @@ def load_excel_from_github(url: str):
 ##############################################
 @st.cache_data
 def load_absence_data(month: str):
+    # URL 수정: 제공해주신 Raw URL 형식으로 (Excel 파일)
     if month == "February":
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/aggregated_absence_rate_by_group_Feb.xlsx"
     else:
@@ -198,20 +199,23 @@ def load_absence_data(month: str):
     return detail, team1, team2
 
 ##############################################
-# 6. Total Absent Information 로딩 (2월/3월 Excel)
+# 6. Total Absent Information 로딩 (2월/3월 CSV)
 ##############################################
 @st.cache_data
-def load_total_absent_excel(month: str):
+def load_total_absent_csv(month: str):
+    # 제공해주신 CSV URL Raw 형식
     if month == "February":
-        url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Feb.xlsx"
+        url = "https://raw.githubusercontent.com/ksmoon848484/absent/c0fc873fb175d937f79ef6b64e8980e0ba51d80f/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Feb.csv"
     else:
-        url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Mar.xlsx"
+        url = "https://raw.githubusercontent.com/ksmoon848484/absent/c0fc873fb175d937f79ef6b64e8980e0ba51d80f/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Mar.csv"
     
-    data_bytes = load_excel_from_github(url)
-    if data_bytes is None:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        st.error(f"Error loading Total Absent CSV from URL:\n{url}\n{e}")
         return None
-    df = pd.read_excel(data_bytes)  # 첫 번째 시트 사용
-    return df
+    return pd.read_csv(BytesIO(response.content))
 
 ##############################################
 # 7. 5PRS Validation 데이터 로딩 (CSV)
@@ -267,7 +271,7 @@ if tab_choice == t["abs_rate_tab"]:
             st.dataframe(team2_df)
         elif sheet_name == "total_absent_info":
             st.header(t["total_absent_info"])
-            total_absent_df = load_total_absent_excel(month_selected)
+            total_absent_df = load_total_absent_csv(month_selected)
             if total_absent_df is None:
                 st.error("Error loading total absent information.")
             else:
