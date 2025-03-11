@@ -88,6 +88,7 @@
 #     st.header(t["team_summary2"])
 #     st.dataframe(team2_df)
 
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -167,7 +168,16 @@ if password != "hwkqip":
 tab_choice = st.sidebar.radio(t["tab_select"], [t["abs_rate_tab"], t["prs_tab"]])
 
 ##############################################
-# 4. requests + BytesIO를 이용해 Excel 파일 불러오기 함수 (예외 처리 포함)
+# 4. "Absence Rate (%)" 전처리 함수
+##############################################
+def convert_absence_rate(df, col="Absence Rate (%)"):
+    if col in df.columns:
+        # "%" 문자 제거 후 숫자형으로 변환
+        df[col] = pd.to_numeric(df[col].astype(str).str.replace("%", "", regex=False).str.strip(), errors="coerce")
+    return df
+
+##############################################
+# 5. requests + BytesIO를 이용해 Excel 파일 불러오기 함수 (예외 처리 포함)
 ##############################################
 @st.cache_data
 def load_excel_from_github(url: str):
@@ -180,11 +190,10 @@ def load_excel_from_github(url: str):
     return BytesIO(response.content)
 
 ##############################################
-# 5. 결근율 데이터 로딩 (2월/3월 Excel)
+# 6. 결근율 데이터 로딩 (2월/3월 Excel)
 ##############################################
 @st.cache_data
 def load_absence_data(month: str):
-    # URL 수정: 제공해주신 Raw URL 형식으로 (Excel 파일)
     if month == "February":
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/aggregated_absence_rate_by_group_Feb.xlsx"
     else:
@@ -196,14 +205,17 @@ def load_absence_data(month: str):
     detail = pd.read_excel(data_bytes, sheet_name='Detail')
     team1 = pd.read_excel(data_bytes, sheet_name='team summary1')
     team2 = pd.read_excel(data_bytes, sheet_name='team summary2')
+    # "Absence Rate (%)" 컬럼을 숫자형으로 변환
+    detail = convert_absence_rate(detail)
+    team1 = convert_absence_rate(team1)
+    team2 = convert_absence_rate(team2)
     return detail, team1, team2
 
 ##############################################
-# 6. Total Absent Information 로딩 (2월/3월 CSV)
+# 7. Total Absent Information 로딩 (2월/3월 CSV)
 ##############################################
 @st.cache_data
 def load_total_absent_csv(month: str):
-    # 제공해주신 CSV URL Raw 형식
     if month == "February":
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/c0fc873fb175d937f79ef6b64e8980e0ba51d80f/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Feb.csv"
     else:
@@ -215,10 +227,13 @@ def load_total_absent_csv(month: str):
     except requests.exceptions.HTTPError as e:
         st.error(f"Error loading Total Absent CSV from URL:\n{url}\n{e}")
         return None
-    return pd.read_csv(BytesIO(response.content))
+    df = pd.read_csv(BytesIO(response.content))
+    # "Absence Rate (%)" 컬럼도 숫자형으로 변환 (필요하다면)
+    df = convert_absence_rate(df)
+    return df
 
 ##############################################
-# 7. 5PRS Validation 데이터 로딩 (CSV)
+# 8. 5PRS Validation 데이터 로딩 (CSV)
 ##############################################
 @st.cache_data
 def load_5prs_data():
@@ -238,7 +253,7 @@ def load_5prs_data():
     return inspector_df, tqc_id_df
 
 ##############################################
-# 8. 메인 UI: 탭별 내용 표시
+# 9. 메인 UI: 탭별 내용 표시
 ##############################################
 st.title(t["title"])
 st.write(t["description"])
@@ -251,31 +266,21 @@ if tab_choice == t["abs_rate_tab"]:
     if detail_df is None:
         st.error("Error loading absence data.")
     else:
-        page_options = {
-            t["detail"]: "Detail",
-            t["team_summary1"]: "team_summary1",
-            t["team_summary2"]: "team_summary2",
-            t["total_absent_info"]: "total_absent_info"
-        }
-        selected_page = st.radio(t["page_select"], list(page_options.keys()))
-        sheet_name = page_options[selected_page]
+        st.header(t["detail"])
+        st.dataframe(detail_df.sort_values("Absence Rate (%)"))
         
-        if sheet_name == "Detail":
-            st.header(t["detail"])
-            st.dataframe(detail_df)
-        elif sheet_name == "team_summary1":
-            st.header(t["team_summary1"])
-            st.dataframe(team1_df)
-        elif sheet_name == "team_summary2":
-            st.header(t["team_summary2"])
-            st.dataframe(team2_df)
-        elif sheet_name == "total_absent_info":
-            st.header(t["total_absent_info"])
-            total_absent_df = load_total_absent_csv(month_selected)
-            if total_absent_df is None:
-                st.error("Error loading total absent information.")
-            else:
-                st.dataframe(total_absent_df)
+        st.header(t["team_summary1"])
+        st.dataframe(team1_df.sort_values("Absence Rate (%)"))
+        
+        st.header(t["team_summary2"])
+        st.dataframe(team2_df.sort_values("Absence Rate (%)"))
+        
+        st.header(t["total_absent_info"])
+        total_absent_df = load_total_absent_csv(month_selected)
+        if total_absent_df is None:
+            st.error("Error loading total absent information.")
+        else:
+            st.dataframe(total_absent_df.sort_values("Absence Rate (%)"))
                 
 elif tab_choice == t["prs_tab"]:
     # 5PRS Validation Info 탭
@@ -287,6 +292,7 @@ elif tab_choice == t["prs_tab"]:
         st.dataframe(inspector_df)
         st.subheader("TQC ID Summary")
         st.dataframe(tqc_id_df)
+
 
 
 
