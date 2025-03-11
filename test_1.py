@@ -101,7 +101,7 @@ translations = {
     "ko": {
         "password_prompt": "비밀번호를 입력하세요",
         "password_error": "비밀번호가 올바르지 않습니다.",
-        "title": "결근율 대시보드",
+        "title": "인센티브 대시보드",
         "description": "엑셀 파일의 각 시트를 활용한 대시보드입니다.",
         "page_select": "페이지 선택",
         "detail": "Detail 데이터",
@@ -117,7 +117,7 @@ translations = {
     "en": {
         "password_prompt": "Enter the password",
         "password_error": "Incorrect password.",
-        "title": "Absence Rate Dashboard",
+        "title": "Incentive Dashboard",
         "description": "This dashboard utilizes Excel files to display data.",
         "page_select": "Select Page",
         "detail": "Detail Data",
@@ -133,7 +133,7 @@ translations = {
     "vi": {
         "password_prompt": "Nhập mật khẩu",
         "password_error": "Mật khẩu không chính xác.",
-        "title": "Bảng điều khiển tỷ lệ vắng mặt",
+        "title": "Bảng điều khiển khuyến khích",
         "description": "Bảng điều khiển này sử dụng file Excel để hiển thị dữ liệu.",
         "page_select": "Chọn trang",
         "detail": "Dữ liệu Detail",
@@ -149,7 +149,7 @@ translations = {
 }
 
 ##############################################
-# 2. 사이드바: 언어 선택 (라디오 버튼) & 비밀번호 보호
+# 2. 사이드바: 언어 선택 (라디오 버튼) 및 비밀번호 보호
 ##############################################
 lang_options = {"Korean": "ko", "English": "en", "Vietnamese": "vi"}
 selected_lang = st.sidebar.radio("Language / " + translations["en"]["language_select"], list(lang_options.keys()))
@@ -177,25 +177,24 @@ def load_excel_from_github(url: str):
     except requests.exceptions.HTTPError as e:
         st.error(f"Error loading file from URL:\n{url}\n{e}")
         return None
-    return pd.ExcelFile(BytesIO(response.content))
+    return BytesIO(response.content)
 
 ##############################################
 # 5. 결근율 데이터 로딩 (2월/3월 Excel)
 ##############################################
 @st.cache_data
 def load_absence_data(month: str):
-    # 실제 URL: 2월/3월 Excel 파일 Raw URL
     if month == "February":
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/aggregated_absence_rate_by_group_Feb.xlsx"
     else:
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/aggregated_absence_rate_by_group_Mar.xlsx"
     
-    xls = load_excel_from_github(url)
-    if xls is None:
+    data_bytes = load_excel_from_github(url)
+    if data_bytes is None:
         return None, None, None
-    detail = pd.read_excel(xls, sheet_name='Detail')
-    team1 = pd.read_excel(xls, sheet_name='team summary1')
-    team2 = pd.read_excel(xls, sheet_name='team summary2')
+    detail = pd.read_excel(data_bytes, sheet_name='Detail')
+    team1 = pd.read_excel(data_bytes, sheet_name='team summary1')
+    team2 = pd.read_excel(data_bytes, sheet_name='team summary2')
     return detail, team1, team2
 
 ##############################################
@@ -203,17 +202,15 @@ def load_absence_data(month: str):
 ##############################################
 @st.cache_data
 def load_total_absent_excel(month: str):
-    # 실제 URL: 2월/3월 Total Absent Excel 파일 Raw URL
     if month == "February":
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Feb.xlsx"
     else:
         url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/Result_UnapprovedAbsence_AbsenceRate_by_PersonnelNo_Mar.xlsx"
     
-    xls = load_excel_from_github(url)
-    if xls is None:
+    data_bytes = load_excel_from_github(url)
+    if data_bytes is None:
         return None
-    # 첫 번째 시트를 사용한다고 가정
-    df = pd.read_excel(xls)
+    df = pd.read_excel(data_bytes)  # 첫 번째 시트 사용
     return df
 
 ##############################################
@@ -221,18 +218,16 @@ def load_total_absent_excel(month: str):
 ##############################################
 @st.cache_data
 def load_5prs_data():
-    # 실제 URL: Inspector_summary.csv, TQC_ID_summary.csv Raw URL
     inspector_url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/Inspector_summary.csv"
     tqc_id_url = "https://raw.githubusercontent.com/ksmoon848484/absent/2ddca50bdd054e76c542323bfd7263acc6c496e4/TQC_ID_summary.csv"
-    
     try:
-        inspector_response = requests.get(inspector_url)
-        inspector_response.raise_for_status()
-        inspector_df = pd.read_csv(BytesIO(inspector_response.content))
+        insp_response = requests.get(inspector_url)
+        insp_response.raise_for_status()
+        inspector_df = pd.read_csv(BytesIO(insp_response.content))
         
-        tqc_id_response = requests.get(tqc_id_url)
-        tqc_id_response.raise_for_status()
-        tqc_id_df = pd.read_csv(BytesIO(tqc_id_response.content))
+        tqc_response = requests.get(tqc_id_url)
+        tqc_response.raise_for_status()
+        tqc_id_df = pd.read_csv(BytesIO(tqc_response.content))
     except requests.exceptions.HTTPError as e:
         st.error(f"Error loading 5PRS data:\n{e}")
         return None, None
@@ -246,15 +241,12 @@ st.write(t["description"])
 
 if tab_choice == t["abs_rate_tab"]:
     # Absence Rate Info 탭
-    # (1) 2월/3월 라디오 버튼 (메인 영역)
     month_selected = st.radio(t["month_select"], ("February", "March"), horizontal=True)
     
-    # (2) 결근율 데이터 로딩
     detail_df, team1_df, team2_df = load_absence_data(month_selected)
     if detail_df is None:
         st.error("Error loading absence data.")
     else:
-        # (3) 페이지(시트) 선택: Detail, team summary1, team summary2, Total Absent Information
         page_options = {
             t["detail"]: "Detail",
             t["team_summary1"]: "team_summary1",
@@ -263,7 +255,7 @@ if tab_choice == t["abs_rate_tab"]:
         }
         selected_page = st.radio(t["page_select"], list(page_options.keys()))
         sheet_name = page_options[selected_page]
-    
+        
         if sheet_name == "Detail":
             st.header(t["detail"])
             st.dataframe(detail_df)
@@ -291,5 +283,6 @@ elif tab_choice == t["prs_tab"]:
         st.dataframe(inspector_df)
         st.subheader("TQC ID Summary")
         st.dataframe(tqc_id_df)
+
 
 
